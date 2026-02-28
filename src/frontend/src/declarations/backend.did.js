@@ -8,109 +8,103 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const Question = IDL.Record({
+  'questionText' : IDL.Text,
+  'correctAnswerIndex' : IDL.Nat,
+  'options' : IDL.Vec(IDL.Text),
+});
+export const Lesson = IDL.Record({
+  'id' : IDL.Text,
+  'title' : IDL.Text,
+  'description' : IDL.Text,
+  'questions' : IDL.Vec(Question),
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
 export const UserProfile = IDL.Record({
+  'xp' : IDL.Nat,
   'username' : IDL.Text,
-  'userId' : IDL.Principal,
-  'totalXP' : IDL.Nat,
   'completedLessons' : IDL.Vec(IDL.Text),
-});
-export const Exercise = IDL.Record({
-  'id' : IDL.Text,
-  'lessonId' : IDL.Text,
-  'question' : IDL.Text,
-  'explanation' : IDL.Text,
-  'correctAnswer' : IDL.Text,
-  'options' : IDL.Vec(IDL.Text),
-});
-export const Lesson = IDL.Record({
-  'id' : IDL.Text,
-  'title' : IDL.Text,
-  'content' : IDL.Text,
-  'order' : IDL.Nat,
-  'xpReward' : IDL.Nat,
-  'description' : IDL.Text,
-  'codeExample' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addLesson' : IDL.Func([Lesson], [], []),
+  'addOrUpdateUserProfile' : IDL.Func([IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'createOrUpdateProfile' : IDL.Func([IDL.Text], [UserProfile], []),
+  'completeLesson' : IDL.Func([IDL.Text], [], []),
+  'deleteLesson' : IDL.Func([IDL.Text], [], []),
+  'getAllLessons' : IDL.Func([], [IDL.Vec(Lesson)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getExercises' : IDL.Func([IDL.Text], [IDL.Vec(Exercise)], ['query']),
-  'getLeaderboard' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+  'getLeaderboard' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+      ['query'],
+    ),
   'getLesson' : IDL.Func([IDL.Text], [IDL.Opt(Lesson)], ['query']),
-  'getLessons' : IDL.Func([], [IDL.Vec(Lesson)], ['query']),
-  'getUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-  'getUserProfileByPrincipal' : IDL.Func(
+  'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'isLessonCompleted' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
-  'saveCallerUserProfile' : IDL.Func([IDL.Text], [], []),
-  'submitLessonProgress' : IDL.Func([IDL.Text, IDL.Nat], [UserProfile], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'submitQuizAnswer' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const Question = IDL.Record({
+    'questionText' : IDL.Text,
+    'correctAnswerIndex' : IDL.Nat,
+    'options' : IDL.Vec(IDL.Text),
+  });
+  const Lesson = IDL.Record({
+    'id' : IDL.Text,
+    'title' : IDL.Text,
+    'description' : IDL.Text,
+    'questions' : IDL.Vec(Question),
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
   const UserProfile = IDL.Record({
+    'xp' : IDL.Nat,
     'username' : IDL.Text,
-    'userId' : IDL.Principal,
-    'totalXP' : IDL.Nat,
     'completedLessons' : IDL.Vec(IDL.Text),
-  });
-  const Exercise = IDL.Record({
-    'id' : IDL.Text,
-    'lessonId' : IDL.Text,
-    'question' : IDL.Text,
-    'explanation' : IDL.Text,
-    'correctAnswer' : IDL.Text,
-    'options' : IDL.Vec(IDL.Text),
-  });
-  const Lesson = IDL.Record({
-    'id' : IDL.Text,
-    'title' : IDL.Text,
-    'content' : IDL.Text,
-    'order' : IDL.Nat,
-    'xpReward' : IDL.Nat,
-    'description' : IDL.Text,
-    'codeExample' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addLesson' : IDL.Func([Lesson], [], []),
+    'addOrUpdateUserProfile' : IDL.Func([IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'createOrUpdateProfile' : IDL.Func([IDL.Text], [UserProfile], []),
+    'completeLesson' : IDL.Func([IDL.Text], [], []),
+    'deleteLesson' : IDL.Func([IDL.Text], [], []),
+    'getAllLessons' : IDL.Func([], [IDL.Vec(Lesson)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getExercises' : IDL.Func([IDL.Text], [IDL.Vec(Exercise)], ['query']),
-    'getLeaderboard' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+    'getLeaderboard' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+        ['query'],
+      ),
     'getLesson' : IDL.Func([IDL.Text], [IDL.Opt(Lesson)], ['query']),
-    'getLessons' : IDL.Func([], [IDL.Vec(Lesson)], ['query']),
-    'getUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
-    'getUserProfileByPrincipal' : IDL.Func(
+    'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'isLessonCompleted' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
-    'saveCallerUserProfile' : IDL.Func([IDL.Text], [], []),
-    'submitLessonProgress' : IDL.Func([IDL.Text, IDL.Nat], [UserProfile], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'submitQuizAnswer' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
   });
 };
 

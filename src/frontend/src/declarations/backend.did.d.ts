@@ -10,27 +10,20 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface Exercise {
-  'id' : string,
-  'lessonId' : string,
-  'question' : string,
-  'explanation' : string,
-  'correctAnswer' : string,
-  'options' : Array<string>,
-}
 export interface Lesson {
   'id' : string,
   'title' : string,
-  'content' : string,
-  'order' : bigint,
-  'xpReward' : bigint,
   'description' : string,
-  'codeExample' : string,
+  'questions' : Array<Question>,
+}
+export interface Question {
+  'questionText' : string,
+  'correctAnswerIndex' : bigint,
+  'options' : Array<string>,
 }
 export interface UserProfile {
+  'xp' : bigint,
   'username' : string,
-  'userId' : Principal,
-  'totalXP' : bigint,
   'completedLessons' : Array<string>,
 }
 export type UserRole = { 'admin' : null } |
@@ -38,20 +31,20 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addLesson' : ActorMethod<[Lesson], undefined>,
+  'addOrUpdateUserProfile' : ActorMethod<[string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'createOrUpdateProfile' : ActorMethod<[string], UserProfile>,
+  'completeLesson' : ActorMethod<[string], undefined>,
+  'deleteLesson' : ActorMethod<[string], undefined>,
+  'getAllLessons' : ActorMethod<[], Array<Lesson>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getExercises' : ActorMethod<[string], Array<Exercise>>,
-  'getLeaderboard' : ActorMethod<[], Array<UserProfile>>,
+  'getLeaderboard' : ActorMethod<[], Array<[string, bigint]>>,
   'getLesson' : ActorMethod<[string], [] | [Lesson]>,
-  'getLessons' : ActorMethod<[], Array<Lesson>>,
-  'getUserProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getUserProfileByPrincipal' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'isLessonCompleted' : ActorMethod<[string], boolean>,
-  'saveCallerUserProfile' : ActorMethod<[string], undefined>,
-  'submitLessonProgress' : ActorMethod<[string, bigint], UserProfile>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'submitQuizAnswer' : ActorMethod<[string, bigint, bigint], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

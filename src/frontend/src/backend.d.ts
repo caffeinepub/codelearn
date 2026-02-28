@@ -7,27 +7,20 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface Exercise {
-    id: string;
-    lessonId: string;
-    question: string;
-    explanation: string;
-    correctAnswer: string;
+export interface Question {
+    questionText: string;
+    correctAnswerIndex: bigint;
     options: Array<string>;
 }
 export interface Lesson {
     id: string;
     title: string;
-    content: string;
-    order: bigint;
-    xpReward: bigint;
     description: string;
-    codeExample: string;
+    questions: Array<Question>;
 }
 export interface UserProfile {
+    xp: bigint;
     username: string;
-    userId: Principal;
-    totalXP: bigint;
     completedLessons: Array<string>;
 }
 export enum UserRole {
@@ -36,18 +29,18 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
+    addLesson(lesson: Lesson): Promise<void>;
+    addOrUpdateUserProfile(username: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    createOrUpdateProfile(username: string): Promise<UserProfile>;
+    completeLesson(lessonId: string): Promise<void>;
+    deleteLesson(lessonId: string): Promise<void>;
+    getAllLessons(): Promise<Array<Lesson>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getExercises(lessonId: string): Promise<Array<Exercise>>;
-    getLeaderboard(): Promise<Array<UserProfile>>;
-    getLesson(lessonId: string): Promise<Lesson | null>;
-    getLessons(): Promise<Array<Lesson>>;
-    getUserProfile(): Promise<UserProfile | null>;
-    getUserProfileByPrincipal(user: Principal): Promise<UserProfile | null>;
+    getLeaderboard(): Promise<Array<[string, bigint]>>;
+    getLesson(id: string): Promise<Lesson | null>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    isLessonCompleted(lessonId: string): Promise<boolean>;
-    saveCallerUserProfile(username: string): Promise<void>;
-    submitLessonProgress(lessonId: string, score: bigint): Promise<UserProfile>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    submitQuizAnswer(lessonId: string, questionIndex: bigint, answerIndex: bigint): Promise<boolean>;
 }

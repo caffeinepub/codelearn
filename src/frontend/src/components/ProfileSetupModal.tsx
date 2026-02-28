@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Code2, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCreateOrUpdateProfile } from "../hooks/useQueries";
+import { Code2, Loader2, Sparkles } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { useCreateOrUpdateProfile } from "../hooks/useQueries";
 
 export function ProfileSetupModal() {
   const [username, setUsername] = useState("");
@@ -49,7 +49,11 @@ export function ProfileSetupModal() {
             <motion.div
               className="w-16 h-16 rounded-2xl bg-python-yellow mx-auto mb-4 flex items-center justify-center glow-yellow"
               animate={{ rotate: [0, -5, 5, -5, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
+              transition={{
+                duration: 1.5,
+                repeat: Number.POSITIVE_INFINITY,
+                repeatDelay: 3,
+              }}
             >
               <Code2 className="w-8 h-8 text-background" />
             </motion.div>
@@ -57,7 +61,8 @@ export function ProfileSetupModal() {
               Welcome to <span className="text-python-yellow">CodeLearn</span>
             </h2>
             <p className="text-muted-foreground text-sm">
-              Choose a username to track your progress and appear on the leaderboard.
+              Choose a username to track your progress and appear on the
+              leaderboard.
             </p>
           </div>
 

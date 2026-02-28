@@ -1,18 +1,33 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  ArrowLeft, Zap, BookOpen, Play, CheckCircle2, XCircle,
-  Loader2, ChevronRight, Trophy, RotateCcw
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useGetLesson, useGetExercises, useSubmitLessonProgress } from "../hooks/useQueries";
-import { useGetUserProfile } from "../hooks/useQueries";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { CodeBlock } from "../components/CodeBlock";
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Loader2,
+  Lock,
+  Play,
+  RotateCcw,
+  Trophy,
+  XCircle,
+  Zap,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 import { toast } from "sonner";
-import type { Exercise } from "../backend.d";
+import type { Question } from "../backend.d";
+import { CodeBlock } from "../components/CodeBlock";
+import { getLessonContent, getXpForLesson } from "../data/lessonContent";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useCompleteLesson,
+  useGetLesson,
+  useGetLessons,
+  useGetUserProfile,
+  useSubmitQuizAnswer,
+} from "../hooks/useQueries";
 
 interface LessonPageProps {
   lessonId: string;
@@ -23,113 +38,143 @@ type LessonView = "content" | "quiz" | "results";
 
 interface QuizState {
   currentIndex: number;
-  selectedAnswer: string | null;
+  selectedAnswerIndex: number | null;
   isAnswered: boolean;
-  correctCount: number;
-  answers: Record<string, { selected: string; correct: boolean }>;
+  isCorrect: boolean | null;
+  answers: Array<{
+    questionIndex: number;
+    answerIndex: number;
+    correct: boolean;
+  }>;
 }
 
 export function LessonPage({ lessonId, onBack }: LessonPageProps) {
   const { identity } = useInternetIdentity();
   const { data: lesson, isLoading: lessonLoading } = useGetLesson(lessonId);
-  const { data: exercises, isLoading: exercisesLoading } = useGetExercises(lessonId);
+  const { data: allLessons } = useGetLessons();
   const { data: profile } = useGetUserProfile();
-  const { mutate: submitProgress, isPending: submitting } = useSubmitLessonProgress();
+  const { mutate: completeLesson, isPending: completing } = useCompleteLesson();
+  const { mutateAsync: submitAnswer } = useSubmitQuizAnswer();
+
   const [view, setView] = useState<LessonView>("content");
   const [xpFloating, setXpFloating] = useState(false);
   const [earnedXP, setEarnedXP] = useState(0);
+  const [submittingAnswer, setSubmittingAnswer] = useState(false);
 
   const [quiz, setQuiz] = useState<QuizState>({
     currentIndex: 0,
-    selectedAnswer: null,
+    selectedAnswerIndex: null,
     isAnswered: false,
-    correctCount: 0,
-    answers: {},
+    isCorrect: null,
+    answers: [],
   });
 
   const isCompleted = profile?.completedLessons.includes(lessonId) ?? false;
-  const currentExercise: Exercise | undefined = exercises?.[quiz.currentIndex];
-  const totalExercises = exercises?.length ?? 0;
+
+  // Get lesson index for XP calculation
+  const lessonIndex = allLessons?.findIndex((l) => l.id === lessonId) ?? 0;
+  const xpReward = getXpForLesson(lessonIndex);
+  const content = lesson ? getLessonContent(lesson.title) : null;
+
+  const questions: Question[] = lesson?.questions ?? [];
+  const totalQuestions = questions.length;
+  const currentQuestion: Question | undefined = questions[quiz.currentIndex];
 
   function handleStartQuiz() {
     setQuiz({
       currentIndex: 0,
-      selectedAnswer: null,
+      selectedAnswerIndex: null,
       isAnswered: false,
-      correctCount: 0,
-      answers: {},
+      isCorrect: null,
+      answers: [],
     });
     setView("quiz");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function handleSelectAnswer(option: string) {
-    if (quiz.isAnswered || !currentExercise) return;
-    const isCorrect = option === currentExercise.correctAnswer;
+  async function handleSelectAnswer(optionIndex: number) {
+    if (quiz.isAnswered || !currentQuestion || submittingAnswer) return;
+
+    setSubmittingAnswer(true);
+
+    let correct = false;
+    if (identity) {
+      try {
+        correct = await submitAnswer({
+          lessonId,
+          questionIndex: BigInt(quiz.currentIndex),
+          answerIndex: BigInt(optionIndex),
+        });
+      } catch {
+        // Fallback: check locally
+        correct = BigInt(optionIndex) === currentQuestion.correctAnswerIndex;
+      }
+    } else {
+      correct = BigInt(optionIndex) === currentQuestion.correctAnswerIndex;
+    }
+
     setQuiz((prev) => ({
       ...prev,
-      selectedAnswer: option,
+      selectedAnswerIndex: optionIndex,
       isAnswered: true,
-      correctCount: isCorrect ? prev.correctCount + 1 : prev.correctCount,
-      answers: {
+      isCorrect: correct,
+      answers: [
         ...prev.answers,
-        [currentExercise.id]: { selected: option, correct: isCorrect },
-      },
+        { questionIndex: prev.currentIndex, answerIndex: optionIndex, correct },
+      ],
     }));
+
+    setSubmittingAnswer(false);
   }
 
   function handleNextQuestion() {
-    if (!exercises) return;
     const nextIndex = quiz.currentIndex + 1;
-    if (nextIndex >= exercises.length) {
+    if (nextIndex >= totalQuestions) {
       // Quiz complete
-      const score = quiz.correctCount + (quiz.answers[currentExercise?.id ?? ""]?.correct ? 0 : 0);
-      const finalCorrect = quiz.answers[currentExercise?.id ?? ""]?.correct
-        ? quiz.correctCount
-        : quiz.correctCount;
-      // Actually recalculate from answers including current
-      const totalCorrect = Object.values({
-        ...quiz.answers,
-        ...(currentExercise ? {
-          [currentExercise.id]: {
-            selected: quiz.selectedAnswer ?? "",
-            correct: quiz.selectedAnswer === currentExercise.correctAnswer
-          }
-        } : {})
-      }).filter((a) => a.correct).length;
-
-      const xpEarned = lesson ? Math.round((totalCorrect / exercises.length) * Number(lesson.xpReward)) : 0;
+      const correctCount = [...quiz.answers].filter((a) => a.correct).length;
+      const xpEarned =
+        totalQuestions > 0
+          ? Math.round((correctCount / totalQuestions) * xpReward)
+          : 0;
       setEarnedXP(xpEarned);
-
-      if (identity) {
-        submitProgress(
-          { lessonId, score: BigInt(totalCorrect) },
-          {
-            onSuccess: () => {
-              toast.success(`Lesson complete! +${xpEarned} XP earned 🎉`);
-              setXpFloating(true);
-              setTimeout(() => setXpFloating(false), 1400);
-            },
-            onError: () => toast.error("Failed to save progress"),
-          }
-        );
-      }
+      setXpFloating(true);
+      setTimeout(() => setXpFloating(false), 1400);
       setView("results");
     } else {
       setQuiz((prev) => ({
         ...prev,
         currentIndex: nextIndex,
-        selectedAnswer: null,
+        selectedAnswerIndex: null,
         isAnswered: false,
+        isCorrect: null,
       }));
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
 
+  function handleMarkComplete() {
+    if (!identity) {
+      toast.error("Sign in to track progress");
+      return;
+    }
+    completeLesson(lessonId, {
+      onSuccess: () => {
+        toast.success("Lesson complete! 🎉");
+        setXpFloating(true);
+        setTimeout(() => setXpFloating(false), 1400);
+      },
+      onError: () => toast.error("Failed to mark lesson complete"),
+    });
+  }
+
   if (lessonLoading) {
     return (
       <div className="container max-w-3xl py-8">
-        <Button variant="ghost" onClick={onBack} className="mb-6 gap-2 text-muted-foreground">
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="mb-6 gap-2 text-muted-foreground"
+        >
           <ArrowLeft className="w-4 h-4" />
           Back to lessons
         </Button>
@@ -147,16 +192,19 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
     return (
       <div className="container max-w-3xl py-8 text-center">
         <p className="text-muted-foreground">Lesson not found.</p>
-        <Button variant="ghost" onClick={onBack} className="mt-4">Back</Button>
+        <Button variant="ghost" onClick={onBack} className="mt-4">
+          Back
+        </Button>
       </div>
     );
   }
 
   // ── RESULTS VIEW ──────────────────────────────────────────────
   if (view === "results") {
-    const totalAnswers = Object.values(quiz.answers).length;
-    const correctAnswers = Object.values(quiz.answers).filter((a) => a.correct).length;
-    const percent = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
+    const correctCount = quiz.answers.filter((a) => a.correct).length;
+    const totalAnswered = quiz.answers.length;
+    const percent =
+      totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
     const isPerfect = percent === 100;
 
     return (
@@ -170,29 +218,40 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
           {/* Trophy animation */}
           <motion.div
             className="w-24 h-24 rounded-full bg-xp-gold/20 border-2 border-xp-gold/50 mx-auto mb-6 flex items-center justify-center text-5xl"
-            animate={isPerfect ? { scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] } : {}}
+            animate={
+              isPerfect ? { scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] } : {}
+            }
             transition={{ duration: 0.6, repeat: isPerfect ? 2 : 0 }}
           >
             {isPerfect ? "🏆" : percent >= 60 ? "⭐" : "📖"}
           </motion.div>
 
           <h2 className="font-display text-3xl font-bold text-foreground mb-2">
-            {isPerfect ? "Perfect Score!" : percent >= 60 ? "Well Done!" : "Keep Practicing!"}
+            {isPerfect
+              ? "Perfect Score!"
+              : percent >= 60
+                ? "Well Done!"
+                : "Keep Practicing!"}
           </h2>
           <p className="text-muted-foreground mb-8">
-            You answered {correctAnswers} of {totalAnswers} questions correctly
+            You answered {correctCount} of {totalAnswered} questions correctly
           </p>
 
-          {/* Score circle */}
+          {/* Score cards */}
           <div className="flex justify-center gap-6 mb-8">
             <div className="bg-card border border-border rounded-2xl p-6 text-center min-w-[120px]">
-              <div className="text-4xl font-display font-bold text-python-yellow">{percent}%</div>
+              <div className="text-4xl font-display font-bold text-python-yellow">
+                {percent}%
+              </div>
               <div className="text-xs text-muted-foreground mt-1">Score</div>
             </div>
             <div className="bg-card border border-border rounded-2xl p-6 text-center min-w-[120px] relative overflow-hidden">
-              <div className="text-4xl font-display font-bold text-xp-gold">+{earnedXP}</div>
-              <div className="text-xs text-muted-foreground mt-1">XP Earned</div>
-              {/* Floating XP animation */}
+              <div className="text-4xl font-display font-bold text-xp-gold">
+                +{earnedXP}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                XP Earned
+              </div>
               <AnimatePresence>
                 {xpFloating && (
                   <motion.div
@@ -211,15 +270,19 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
           </div>
 
           {/* Answer review */}
-          {exercises && exercises.length > 0 && (
+          {questions.length > 0 && quiz.answers.length > 0 && (
             <div className="text-left mb-8 space-y-3">
-              <h3 className="font-display font-semibold text-foreground mb-3">Review</h3>
-              {exercises.map((ex, i) => {
-                const answer = quiz.answers[ex.id];
-                if (!answer) return null;
+              <h3 className="font-display font-semibold text-foreground mb-3">
+                Review
+              </h3>
+              {quiz.answers.map((answer, i) => {
+                const q = questions[answer.questionIndex];
+                if (!q) return null;
+                const correctOption = q.options[Number(q.correctAnswerIndex)];
+                const selectedOption = q.options[answer.answerIndex];
                 return (
                   <div
-                    key={ex.id}
+                    key={`q-${answer.questionIndex}`}
                     className={`p-4 rounded-xl border ${answer.correct ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}
                   >
                     <div className="flex items-start gap-2 mb-2">
@@ -229,19 +292,45 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
                         <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                       )}
                       <span className="text-sm font-medium text-foreground">
-                        Q{i + 1}: {ex.question}
+                        Q{i + 1}: {q.questionText}
                       </span>
                     </div>
                     {!answer.correct && (
                       <div className="ml-6 text-xs text-muted-foreground space-y-1">
-                        <div><span className="text-destructive">Your answer:</span> {answer.selected}</div>
-                        <div><span className="text-success">Correct:</span> {ex.correctAnswer}</div>
-                        <div className="text-muted-foreground italic">{ex.explanation}</div>
+                        <div>
+                          <span className="text-destructive">Your answer:</span>{" "}
+                          {selectedOption}
+                        </div>
+                        <div>
+                          <span className="text-success">Correct:</span>{" "}
+                          {correctOption}
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Mark as complete if not done yet */}
+          {!isCompleted && identity && (
+            <div className="mb-6 p-4 rounded-xl border border-python-yellow/30 bg-python-yellow/5 text-left">
+              <p className="text-sm text-foreground mb-3 font-medium">
+                Ready to mark this lesson as complete?
+              </p>
+              <Button
+                onClick={handleMarkComplete}
+                disabled={completing}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              >
+                {completing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" />
+                )}
+                {completing ? "Saving..." : "Mark as Complete"}
+              </Button>
             </div>
           )}
 
@@ -254,15 +343,13 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
               <ArrowLeft className="w-4 h-4" />
               Back to Lessons
             </Button>
-            {!isPerfect && (
-              <Button
-                onClick={handleStartQuiz}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Retry Quiz
-              </Button>
-            )}
+            <Button
+              onClick={handleStartQuiz}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Retry Quiz
+            </Button>
           </div>
         </motion.div>
       </div>
@@ -271,7 +358,7 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
 
   // ── QUIZ VIEW ────────────────────────────────────────────────
   if (view === "quiz") {
-    if (exercisesLoading || !currentExercise) {
+    if (!currentQuestion) {
       return (
         <div className="container max-w-2xl py-8 flex justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-python-yellow" />
@@ -279,7 +366,27 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
       );
     }
 
-    const progress = ((quiz.currentIndex + (quiz.isAnswered ? 1 : 0)) / totalExercises) * 100;
+    if (totalQuestions === 0) {
+      return (
+        <div className="container max-w-2xl py-8 text-center">
+          <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-muted-foreground">
+            No quiz questions for this lesson yet.
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() => setView("content")}
+            className="mt-4 gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to lesson
+          </Button>
+        </div>
+      );
+    }
+
+    const progress =
+      ((quiz.currentIndex + (quiz.isAnswered ? 1 : 0)) / totalQuestions) * 100;
 
     return (
       <div className="container max-w-2xl py-8">
@@ -294,7 +401,7 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
             Back to lesson
           </Button>
           <span className="text-sm text-muted-foreground font-mono">
-            Question {quiz.currentIndex + 1} / {totalExercises}
+            Question {quiz.currentIndex + 1} / {totalQuestions}
           </span>
         </div>
 
@@ -310,53 +417,71 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
           >
             {/* Question */}
             <h2 className="font-display text-xl font-semibold text-foreground mb-6 leading-relaxed">
-              {currentExercise.question}
+              {currentQuestion.questionText}
             </h2>
 
             {/* Options */}
             <div className="grid gap-3 mb-6">
-              {currentExercise.options.map((option) => {
-                const isSelected = quiz.selectedAnswer === option;
-                const isCorrect = option === currentExercise.correctAnswer;
-                const isWrong = quiz.isAnswered && isSelected && !isCorrect;
-                const isRevealedCorrect = quiz.isAnswered && isCorrect;
+              {currentQuestion.options.map((option, optionIndex) => {
+                const isSelected = quiz.selectedAnswerIndex === optionIndex;
+                const isCorrectOption =
+                  BigInt(optionIndex) === currentQuestion.correctAnswerIndex;
+                const isWrong =
+                  quiz.isAnswered && isSelected && !isCorrectOption;
+                const isRevealedCorrect = quiz.isAnswered && isCorrectOption;
 
                 return (
                   <motion.button
                     key={option}
                     type="button"
-                    onClick={() => handleSelectAnswer(option)}
-                    disabled={quiz.isAnswered}
-                    whileHover={!quiz.isAnswered ? { scale: 1.01 } : {}}
-                    whileTap={!quiz.isAnswered ? { scale: 0.99 } : {}}
+                    onClick={() => handleSelectAnswer(optionIndex)}
+                    disabled={quiz.isAnswered || submittingAnswer}
+                    whileHover={
+                      !quiz.isAnswered && !submittingAnswer
+                        ? { scale: 1.01 }
+                        : {}
+                    }
+                    whileTap={
+                      !quiz.isAnswered && !submittingAnswer
+                        ? { scale: 0.99 }
+                        : {}
+                    }
                     className={`
                       w-full text-left p-4 rounded-xl border-2 font-medium text-sm transition-all
                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                      ${isRevealedCorrect
-                        ? "border-success bg-success/10 text-foreground"
-                        : isWrong
-                          ? "border-destructive bg-destructive/10 text-foreground"
-                          : isSelected
-                            ? "border-python-yellow bg-primary/10 text-foreground"
-                            : quiz.isAnswered
-                              ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed"
-                              : "border-border bg-card hover:border-python-yellow/60 hover:bg-primary/5 text-foreground cursor-pointer"
+                      ${
+                        isRevealedCorrect
+                          ? "border-success bg-success/10 text-foreground"
+                          : isWrong
+                            ? "border-destructive bg-destructive/10 text-foreground"
+                            : isSelected
+                              ? "border-python-yellow bg-primary/10 text-foreground"
+                              : quiz.isAnswered
+                                ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed"
+                                : "border-border bg-card hover:border-python-yellow/60 hover:bg-primary/5 text-foreground cursor-pointer"
                       }
                     `}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`
+                      <div
+                        className={`
                         w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 text-xs font-bold
-                        ${isRevealedCorrect
-                          ? "border-success bg-success text-background"
-                          : isWrong
-                            ? "border-destructive bg-destructive text-background"
-                            : isSelected
-                              ? "border-python-yellow bg-python-yellow text-background"
-                              : "border-border text-muted-foreground"
+                        ${
+                          isRevealedCorrect
+                            ? "border-success bg-success text-background"
+                            : isWrong
+                              ? "border-destructive bg-destructive text-background"
+                              : isSelected
+                                ? "border-python-yellow bg-python-yellow text-background"
+                                : "border-border text-muted-foreground"
                         }
-                      `}>
-                        {isRevealedCorrect ? "✓" : isWrong ? "✗" : ""}
+                      `}
+                      >
+                        {isRevealedCorrect
+                          ? "✓"
+                          : isWrong
+                            ? "✗"
+                            : String.fromCharCode(65 + optionIndex)}
                       </div>
                       {option}
                     </div>
@@ -365,7 +490,15 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
               })}
             </div>
 
-            {/* Explanation feedback */}
+            {/* Submitting indicator */}
+            {submittingAnswer && (
+              <div className="flex items-center justify-center gap-2 mb-4 text-muted-foreground text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Checking answer...
+              </div>
+            )}
+
+            {/* Feedback */}
             <AnimatePresence>
               {quiz.isAnswered && (
                 <motion.div
@@ -374,26 +507,26 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
                   exit={{ opacity: 0, height: 0 }}
                   className={`
                     rounded-xl p-4 mb-6 border
-                    ${quiz.selectedAnswer === currentExercise.correctAnswer
-                      ? "bg-success/10 border-success/30"
-                      : "bg-destructive/10 border-destructive/30"
+                    ${
+                      quiz.isCorrect
+                        ? "bg-success/10 border-success/30"
+                        : "bg-destructive/10 border-destructive/30"
                     }
                   `}
                 >
                   <div className="flex items-start gap-2">
-                    {quiz.selectedAnswer === currentExercise.correctAnswer ? (
+                    {quiz.isCorrect ? (
                       <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
                     ) : (
                       <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                     )}
-                    <div>
-                      <p className={`text-sm font-semibold mb-1 ${
-                        quiz.selectedAnswer === currentExercise.correctAnswer ? "text-success" : "text-destructive"
-                      }`}>
-                        {quiz.selectedAnswer === currentExercise.correctAnswer ? "Correct! 🎉" : "Not quite!"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{currentExercise.explanation}</p>
-                    </div>
+                    <p
+                      className={`text-sm font-semibold ${quiz.isCorrect ? "text-success" : "text-destructive"}`}
+                    >
+                      {quiz.isCorrect
+                        ? "Correct! 🎉"
+                        : `Not quite — the correct answer is: ${currentQuestion.options[Number(currentQuestion.correctAnswerIndex)]}`}
+                    </p>
                   </div>
                 </motion.div>
               )}
@@ -407,15 +540,16 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
               >
                 <Button
                   onClick={handleNextQuestion}
-                  disabled={submitting}
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2 h-11"
                 >
-                  {submitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : quiz.currentIndex + 1 < totalExercises ? (
-                    <>Next Question <ChevronRight className="w-4 h-4" /></>
+                  {quiz.currentIndex + 1 < totalQuestions ? (
+                    <>
+                      Next Question <ChevronRight className="w-4 h-4" />
+                    </>
                   ) : (
-                    <>Finish Quiz <Trophy className="w-4 h-4" /></>
+                    <>
+                      Finish Quiz <Trophy className="w-4 h-4" />
+                    </>
                   )}
                 </Button>
               </motion.div>
@@ -427,8 +561,6 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
   }
 
   // ── LESSON CONTENT VIEW ───────────────────────────────────────
-
-
   return (
     <div className="container max-w-3xl py-8">
       {/* Back button */}
@@ -448,19 +580,36 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
         transition={{ duration: 0.35 }}
         className="mb-8"
       >
-        <div className="flex items-center gap-2 mb-3">
-          <Badge variant="outline" className="text-xs border-python-yellow/40 text-python-yellow bg-python-yellow/10">
-            Lesson {String(Number(lesson.order)).padStart(2, "0")}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <Badge
+            variant="outline"
+            className="text-xs border-python-yellow/40 text-python-yellow bg-python-yellow/10"
+          >
+            Lesson {String(lessonIndex + 1).padStart(2, "0")}
           </Badge>
           {isCompleted && (
-            <Badge variant="outline" className="text-xs border-success/40 text-success bg-success/10">
+            <Badge
+              variant="outline"
+              className="text-xs border-success/40 text-success bg-success/10"
+            >
               <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
             </Badge>
           )}
-          <Badge variant="outline" className="text-xs border-border bg-xp-gold/10 text-xp-gold">
+          <Badge
+            variant="outline"
+            className="text-xs border-border bg-xp-gold/10 text-xp-gold"
+          >
             <Zap className="w-3 h-3 mr-1" />
-            {Number(lesson.xpReward)} XP
+            {xpReward} XP
           </Badge>
+          {content && (
+            <Badge
+              variant="outline"
+              className="text-xs border-python-blue/40 text-python-blue bg-python-blue/10"
+            >
+              {content.topicTag}
+            </Badge>
+          )}
         </div>
 
         <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-3">
@@ -471,34 +620,19 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
         </p>
       </motion.div>
 
-      {/* Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.35 }}
-        className="prose prose-sm max-w-none mb-8"
-      >
-        {lesson.content.split("\n\n").map((paragraph) => (
-          <p
-            key={paragraph.slice(0, 40)}
-            className="text-foreground/90 leading-relaxed mb-4 text-base"
-          >
-            {paragraph}
-          </p>
-        ))}
-      </motion.div>
-
       {/* Code example */}
-      {lesson.codeExample && (
+      {content && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.35 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="w-4 h-4 text-python-yellow" />
-            <h3 className="font-display font-semibold text-foreground">Code Example</h3>
+            <h3 className="font-display font-semibold text-foreground">
+              Code Example
+            </h3>
           </div>
           <div className="rounded-xl overflow-hidden border border-border shadow-card">
             {/* Terminal header */}
@@ -508,9 +642,11 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
                 <div className="w-3 h-3 rounded-full bg-xp-gold/70" />
                 <div className="w-3 h-3 rounded-full bg-success/70" />
               </div>
-              <span className="text-xs text-muted-foreground font-mono ml-2">example.py</span>
+              <span className="text-xs text-muted-foreground font-mono ml-2">
+                example.py
+              </span>
             </div>
-            <CodeBlock code={lesson.codeExample} />
+            <CodeBlock code={content.codeExample} />
           </div>
         </motion.div>
       )}
@@ -519,8 +655,8 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.35 }}
-        className="bg-card border border-border rounded-xl p-6"
+        transition={{ delay: 0.2, duration: 0.35 }}
+        className="bg-card border border-border rounded-xl p-6 mb-6"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex-1">
@@ -528,26 +664,44 @@ export function LessonPage({ lessonId, onBack }: LessonPageProps) {
               Ready to test your knowledge?
             </h3>
             <p className="text-sm text-muted-foreground">
-              {exercisesLoading
-                ? "Loading exercises..."
-                : `${exercises?.length ?? 0} multiple-choice questions · Earn up to ${Number(lesson.xpReward)} XP`
-              }
+              {totalQuestions > 0
+                ? `${totalQuestions} multiple-choice question${totalQuestions !== 1 ? "s" : ""} · Earn up to ${xpReward} XP`
+                : "No quiz available for this lesson yet"}
             </p>
           </div>
           <Button
             onClick={handleStartQuiz}
-            disabled={exercisesLoading || !exercises?.length}
+            disabled={totalQuestions === 0}
             className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 whitespace-nowrap"
           >
-            {exercisesLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4" />
-            )}
+            <Play className="w-4 h-4" />
             {isCompleted ? "Retake Quiz" : "Start Quiz"}
           </Button>
         </div>
       </motion.div>
+
+      {/* Mark as complete (if authenticated and not complete) */}
+      {identity && !isCompleted && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+        >
+          <Button
+            onClick={handleMarkComplete}
+            disabled={completing}
+            variant="outline"
+            className="w-full gap-2 border-success/40 text-success hover:bg-success/10 hover:border-success h-11"
+          >
+            {completing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4" />
+            )}
+            {completing ? "Saving..." : "Mark as Complete"}
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 }

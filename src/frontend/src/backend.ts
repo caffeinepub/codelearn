@@ -89,27 +89,20 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface Exercise {
-    id: string;
-    lessonId: string;
-    question: string;
-    explanation: string;
-    correctAnswer: string;
+export interface Question {
+    questionText: string;
+    correctAnswerIndex: bigint;
     options: Array<string>;
 }
 export interface Lesson {
     id: string;
     title: string;
-    content: string;
-    order: bigint;
-    xpReward: bigint;
     description: string;
-    codeExample: string;
+    questions: Array<Question>;
 }
 export interface UserProfile {
+    xp: bigint;
     username: string;
-    userId: Principal;
-    totalXP: bigint;
     completedLessons: Array<string>;
 }
 export enum UserRole {
@@ -119,20 +112,20 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    addLesson(lesson: Lesson): Promise<void>;
+    addOrUpdateUserProfile(username: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    createOrUpdateProfile(username: string): Promise<UserProfile>;
+    completeLesson(lessonId: string): Promise<void>;
+    deleteLesson(lessonId: string): Promise<void>;
+    getAllLessons(): Promise<Array<Lesson>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getExercises(lessonId: string): Promise<Array<Exercise>>;
-    getLeaderboard(): Promise<Array<UserProfile>>;
-    getLesson(lessonId: string): Promise<Lesson | null>;
-    getLessons(): Promise<Array<Lesson>>;
-    getUserProfile(): Promise<UserProfile | null>;
-    getUserProfileByPrincipal(user: Principal): Promise<UserProfile | null>;
+    getLeaderboard(): Promise<Array<[string, bigint]>>;
+    getLesson(id: string): Promise<Lesson | null>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    isLessonCompleted(lessonId: string): Promise<boolean>;
-    saveCallerUserProfile(username: string): Promise<void>;
-    submitLessonProgress(lessonId: string, score: bigint): Promise<UserProfile>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    submitQuizAnswer(lessonId: string, questionIndex: bigint, answerIndex: bigint): Promise<boolean>;
 }
 import type { Lesson as _Lesson, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -151,6 +144,34 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async addLesson(arg0: Lesson): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addLesson(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addLesson(arg0);
+            return result;
+        }
+    }
+    async addOrUpdateUserProfile(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addOrUpdateUserProfile(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addOrUpdateUserProfile(arg0);
+            return result;
+        }
+    }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
         if (this.processError) {
             try {
@@ -165,17 +186,45 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createOrUpdateProfile(arg0: string): Promise<UserProfile> {
+    async completeLesson(arg0: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.createOrUpdateProfile(arg0);
+                const result = await this.actor.completeLesson(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createOrUpdateProfile(arg0);
+            const result = await this.actor.completeLesson(arg0);
+            return result;
+        }
+    }
+    async deleteLesson(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteLesson(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteLesson(arg0);
+            return result;
+        }
+    }
+    async getAllLessons(): Promise<Array<Lesson>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllLessons();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllLessons();
             return result;
         }
     }
@@ -207,21 +256,7 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n4(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getExercises(arg0: string): Promise<Array<Exercise>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getExercises(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getExercises(arg0);
-            return result;
-        }
-    }
-    async getLeaderboard(): Promise<Array<UserProfile>> {
+    async getLeaderboard(): Promise<Array<[string, bigint]>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getLeaderboard();
@@ -249,45 +284,17 @@ export class Backend implements backendInterface {
             return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLessons(): Promise<Array<Lesson>> {
+    async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLessons();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getLessons();
-            return result;
-        }
-    }
-    async getUserProfile(): Promise<UserProfile | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getUserProfile();
+                const result = await this.actor.getUserProfile(arg0);
                 return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getUserProfile();
-            return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getUserProfileByPrincipal(arg0: Principal): Promise<UserProfile | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getUserProfileByPrincipal(arg0);
-                return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getUserProfileByPrincipal(arg0);
+            const result = await this.actor.getUserProfile(arg0);
             return from_candid_opt_n3(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -305,21 +312,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async isLessonCompleted(arg0: string): Promise<boolean> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.isLessonCompleted(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.isLessonCompleted(arg0);
-            return result;
-        }
-    }
-    async saveCallerUserProfile(arg0: string): Promise<void> {
+    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
                 const result = await this.actor.saveCallerUserProfile(arg0);
@@ -333,17 +326,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async submitLessonProgress(arg0: string, arg1: bigint): Promise<UserProfile> {
+    async submitQuizAnswer(arg0: string, arg1: bigint, arg2: bigint): Promise<boolean> {
         if (this.processError) {
             try {
-                const result = await this.actor.submitLessonProgress(arg0, arg1);
+                const result = await this.actor.submitQuizAnswer(arg0, arg1, arg2);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.submitLessonProgress(arg0, arg1);
+            const result = await this.actor.submitQuizAnswer(arg0, arg1, arg2);
             return result;
         }
     }

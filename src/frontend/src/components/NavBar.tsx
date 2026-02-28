@@ -1,12 +1,22 @@
-import { motion } from "motion/react";
-import { BookOpen, Trophy, User, Code2, LogIn, LogOut, Loader2, Menu, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  BookOpen,
+  Code2,
+  Loader2,
+  LogIn,
+  LogOut,
+  Menu,
+  Trophy,
+  User,
+  X,
+} from "lucide-react";
+import { motion } from "motion/react";
+import { useState } from "react";
+import type { Page } from "../App";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetUserProfile } from "../hooks/useQueries";
-import type { Page } from "../App";
-import { useState } from "react";
 
 interface NavBarProps {
   currentPage: Page;
@@ -16,10 +26,12 @@ interface NavBarProps {
 const navLinks = [
   { id: "dashboard" as Page, label: "Learn", icon: BookOpen },
   { id: "leaderboard" as Page, label: "Leaderboard", icon: Trophy },
+  { id: "profile" as Page, label: "Profile", icon: User },
 ];
 
 export function NavBar({ currentPage, onNavigate }: NavBarProps) {
-  const { identity, login, clear, isLoggingIn, isInitializing } = useInternetIdentity();
+  const { identity, login, clear, isLoggingIn, isInitializing } =
+    useInternetIdentity();
   const { data: profile } = useGetUserProfile();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAuthenticated = !!identity;
@@ -40,7 +52,10 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
           <span className="text-foreground">
             Code<span className="text-python-yellow">Learn</span>
           </span>
-          <Badge variant="outline" className="text-[10px] border-python-blue text-python-blue hidden sm:inline-flex">
+          <Badge
+            variant="outline"
+            className="text-[10px] border-python-blue text-python-blue hidden sm:inline-flex"
+          >
             Python
           </Badge>
         </motion.button>
@@ -53,15 +68,16 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
             return (
               <button
                 key={link.id}
-              onClick={() => onNavigate(link.id)}
-                  type="button"
-                  className={`
-                    flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all
-                    ${isActive
-                    ? "bg-primary/10 text-python-yellow"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                onClick={() => onNavigate(link.id)}
+                type="button"
+                className={`
+                  flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all
+                  ${
+                    isActive
+                      ? "bg-primary/10 text-python-yellow"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }
-                `}
+              `}
               >
                 <Icon className="w-4 h-4" />
                 {link.label}
@@ -78,19 +94,23 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
             >
-              <span className="text-xp-gold text-xs font-mono font-bold">⚡</span>
+              <span className="text-xp-gold text-xs font-mono font-bold">
+                ⚡
+              </span>
               <span className="text-sm font-semibold text-xp-gold font-mono">
-                {Number(profile.totalXP).toLocaleString()} XP
+                {Number(profile.xp).toLocaleString()} XP
               </span>
             </motion.div>
           )}
 
           {isAuthenticated && profile && (
-            <Avatar className="w-8 h-8 ring-2 ring-python-yellow/30">
-              <AvatarFallback className="bg-primary/10 text-python-yellow text-xs font-bold">
-                {profile.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <button type="button" onClick={() => onNavigate("profile")}>
+              <Avatar className="w-8 h-8 ring-2 ring-python-yellow/30 cursor-pointer hover:ring-python-yellow/60 transition-all">
+                <AvatarFallback className="bg-primary/10 text-python-yellow text-xs font-bold">
+                  {profile.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </button>
           )}
 
           {isAuthenticated ? (
@@ -128,7 +148,11 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
             className="md:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            {mobileOpen ? (
+              <X className="w-4 h-4" />
+            ) : (
+              <Menu className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -154,9 +178,10 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
                   }}
                   className={`
                     flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium transition-all text-left
-                    ${isActive
-                      ? "bg-primary/10 text-python-yellow"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ${
+                      isActive
+                        ? "bg-primary/10 text-python-yellow"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     }
                   `}
                 >
@@ -168,7 +193,10 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
             {isAuthenticated && (
               <button
                 type="button"
-                onClick={() => { clear(); setMobileOpen(false); }}
+                onClick={() => {
+                  clear();
+                  setMobileOpen(false);
+                }}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-destructive transition-all text-left"
               >
                 <LogOut className="w-4 h-4" />
@@ -179,8 +207,12 @@ export function NavBar({ currentPage, onNavigate }: NavBarProps) {
           {profile && (
             <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg">
               <User className="w-4 h-4 text-python-yellow" />
-              <span className="text-sm text-foreground font-medium">{profile.username}</span>
-              <span className="ml-auto text-xp-gold font-mono text-xs font-bold">⚡ {Number(profile.totalXP)} XP</span>
+              <span className="text-sm text-foreground font-medium">
+                {profile.username}
+              </span>
+              <span className="ml-auto text-xp-gold font-mono text-xs font-bold">
+                ⚡ {Number(profile.xp)} XP
+              </span>
             </div>
           )}
         </motion.div>

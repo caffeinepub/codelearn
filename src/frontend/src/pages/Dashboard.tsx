@@ -1,19 +1,28 @@
-import { motion } from "motion/react";
-import { Zap, BookOpen, CheckCircle2, Trophy, LogIn, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { LessonCard, LessonCardSkeleton } from "../components/LessonCard";
-import { useGetLessons, useGetUserProfile } from "../hooks/useQueries";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  BookOpen,
+  CheckCircle2,
+  Loader2,
+  LogIn,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import { motion } from "motion/react";
 import type { Page } from "../App";
 import type { Lesson } from "../backend.d";
+import { LessonCard, LessonCardSkeleton } from "../components/LessonCard";
+import { getXpForLesson } from "../data/lessonContent";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useGetLessons, useGetUserProfile } from "../hooks/useQueries";
 
 interface DashboardProps {
   onNavigate: (page: Page, lessonId?: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { identity, login, isLoggingIn, isInitializing } = useInternetIdentity();
+  const { identity, login, isLoggingIn, isInitializing } =
+    useInternetIdentity();
   const { data: lessons, isLoading: lessonsLoading } = useGetLessons();
   const { data: profile, isLoading: profileLoading } = useGetUserProfile();
 
@@ -21,12 +30,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const completedLessons = profile?.completedLessons ?? [];
   const totalLessons = lessons?.length ?? 0;
   const completedCount = completedLessons.length;
-  const progressPercent = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
+  const progressPercent =
+    totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0;
 
-  function isLessonLocked(lesson: Lesson, index: number): boolean {
+  function isLessonLocked(_lesson: Lesson, index: number): boolean {
     if (index === 0) return false;
     if (!isAuthenticated) return index > 0;
-    // Lesson is locked if previous lesson not completed
     const previousLesson = lessons?.[index - 1];
     if (!previousLesson) return false;
     return !completedLessons.includes(previousLesson.id);
@@ -56,11 +65,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </span>
             </div>
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-2">
-              Learn Python<br />
-              <span className="text-python-yellow text-glow-yellow">from Scratch</span>
+              Learn Python
+              <br />
+              <span className="text-python-yellow text-glow-yellow">
+                from Scratch
+              </span>
             </h1>
             <p className="text-muted-foreground text-sm max-w-xs mb-5">
-              Interactive lessons, quizzes, and real code examples to master Python programming.
+              Interactive lessons, quizzes, and real code examples to master
+              Python programming.
             </p>
 
             {!isAuthenticated ? (
@@ -80,12 +93,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5 border border-border">
                   <CheckCircle2 className="w-4 h-4 text-success" />
-                  <span className="text-sm font-medium">{completedCount}/{totalLessons} lessons</span>
+                  <span className="text-sm font-medium">
+                    {completedCount}/{totalLessons} lessons
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5 border border-border">
                   <Zap className="w-4 h-4 text-xp-gold" />
                   <span className="text-sm font-medium text-xp-gold font-mono">
-                    {Number(profile?.totalXP ?? 0).toLocaleString()} XP
+                    {Number(profile?.xp ?? 0).toLocaleString()} XP
                   </span>
                 </div>
               </div>
@@ -106,7 +121,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {
               icon: Zap,
               label: "Total XP",
-              value: Number(profile.totalXP).toLocaleString(),
+              value: Number(profile.xp).toLocaleString(),
               color: "text-xp-gold",
               bg: "bg-xp-gold/10",
             },
@@ -132,8 +147,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 className={`${stat.bg} border border-border rounded-xl p-4 flex flex-col items-center text-center`}
               >
                 <Icon className={`w-5 h-5 ${stat.color} mb-1.5`} />
-                <div className={`text-lg font-display font-bold ${stat.color}`}>{stat.value}</div>
-                <div className="text-xs text-muted-foreground">{stat.label}</div>
+                <div className={`text-lg font-display font-bold ${stat.color}`}>
+                  {stat.value}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {stat.label}
+                </div>
               </div>
             );
           })}
@@ -149,7 +168,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           className="mb-8"
         >
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-foreground">Course Progress</span>
+            <span className="text-sm font-medium text-foreground">
+              Course Progress
+            </span>
             <span className="text-sm text-muted-foreground font-mono">
               {completedCount} / {totalLessons}
             </span>
@@ -162,7 +183,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-python-yellow" />
-          <h2 className="font-display text-xl font-bold text-foreground">Python Lessons</h2>
+          <h2 className="font-display text-xl font-bold text-foreground">
+            Python Lessons
+          </h2>
         </div>
         {totalLessons > 0 && (
           <span className="text-sm text-muted-foreground font-mono">
@@ -185,6 +208,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               isCompleted={completedLessons.includes(lesson.id)}
               isLocked={isLessonLocked(lesson, index)}
               index={index}
+              xpReward={getXpForLesson(index)}
               onClick={() => onNavigate("lesson", lesson.id)}
             />
           ))

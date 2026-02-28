@@ -1,14 +1,15 @@
-import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { useState } from "react";
 import { NavBar } from "./components/NavBar";
-import { Dashboard } from "./pages/Dashboard";
-import { LessonPage } from "./pages/LessonPage";
-import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { ProfileSetupModal } from "./components/ProfileSetupModal";
-import { useGetUserProfile } from "./hooks/useQueries";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { useGetUserProfile } from "./hooks/useQueries";
+import { Dashboard } from "./pages/Dashboard";
+import { LeaderboardPage } from "./pages/LeaderboardPage";
+import { LessonPage } from "./pages/LessonPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
-export type Page = "dashboard" | "lesson" | "leaderboard";
+export type Page = "dashboard" | "lesson" | "leaderboard" | "profile";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
@@ -17,10 +18,7 @@ export default function App() {
   const { data: profile, isLoading: profileLoading } = useGetUserProfile();
 
   const showProfileSetup =
-    !isInitializing &&
-    !profileLoading &&
-    !!identity &&
-    profile === null;
+    !isInitializing && !profileLoading && !!identity && profile === null;
 
   function navigateTo(page: Page, lessonId?: string) {
     setCurrentPage(page);
@@ -35,18 +33,15 @@ export default function App() {
       <NavBar currentPage={currentPage} onNavigate={navigateTo} />
 
       <main className="flex-1">
-        {currentPage === "dashboard" && (
-          <Dashboard onNavigate={navigateTo} />
-        )}
+        {currentPage === "dashboard" && <Dashboard onNavigate={navigateTo} />}
         {currentPage === "lesson" && activeLessonId && (
           <LessonPage
             lessonId={activeLessonId}
             onBack={() => navigateTo("dashboard")}
           />
         )}
-        {currentPage === "leaderboard" && (
-          <LeaderboardPage />
-        )}
+        {currentPage === "leaderboard" && <LeaderboardPage />}
+        {currentPage === "profile" && <ProfilePage />}
       </main>
 
       <footer className="border-t border-border py-6 mt-8">
